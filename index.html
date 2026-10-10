@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ruleta Jairo Indumentaria</title>
+<style>
+  :root{
+    --bg1:#0d0f1a; --bg2:#1b1040;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;color:#fff}
+  body{
+    background:
+      radial-gradient(circle at 20% 15%, #ff2d9555 0, transparent 40%),
+      radial-gradient(circle at 85% 20%, #00d4ff44 0, transparent 40%),
+      radial-gradient(circle at 50% 100%, #ffd60a33 0, transparent 45%),
+      linear-gradient(160deg,var(--bg1),var(--bg2));
+    display:flex;flex-direction:column;align-items:center;justify-content:space-between;
+    padding:max(12px,env(safe-area-inset-top)) 12px max(14px,env(safe-area-inset-bottom));
+  }
+  body.ar{background:transparent}
+  #cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1;display:none;background:#000}
+  body.ar #cam{display:block}
+
+  header{text-align:center;transition:opacity .3s}
+  header h1{
+    margin:0;font-size:clamp(26px,5.5vw,48px);letter-spacing:2px;font-weight:900;
+    background:linear-gradient(90deg,#ff3d81,#ffb800,#3ddc84,#00c2ff,#a259ff,#ff3d81);
+    background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+    animation:slide 6s linear infinite;
+  }
+  header p{margin:2px 0 0;opacity:.85;font-size:clamp(13px,2.4vw,18px)}
+  @keyframes slide{to{background-position:300% 0}}
+  body.ar header{opacity:0;pointer-events:none;height:0;overflow:hidden}
+
+  #scene{perspective:900px;flex:1;display:flex;align-items:center;justify-content:center;width:100%;min-height:0}
+  #stage{
+    width:min(92vw,62vh,560px);aspect-ratio:1;position:relative;touch-action:none;
+    transform-style:preserve-3d;will-change:transform;
+  }
+  #wheel{width:100%;height:100%;display:block;filter:drop-shadow(0 18px 30px #000a)}
+  body.ar #stage{cursor:grab}
+
+  #controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}
+  button{
+    font:inherit;font-weight:900;letter-spacing:1px;border:0;border-radius:999px;color:#fff;
+    padding:14px 26px;font-size:clamp(15px,3.6vw,22px);cursor:pointer;
+    box-shadow:0 6px 0 #0006,0 10px 20px #0005;transition:transform .08s, filter .2s, box-shadow .08s;
+  }
+  button:active:not(:disabled){transform:translateY(4px);box-shadow:0 2px 0 #0006}
+  button:disabled{filter:grayscale(1) brightness(.6);cursor:not-allowed}
+  #btnSpin{background:linear-gradient(180deg,#34e27a,#12a850)}
+  #btnStop{background:linear-gradient(180deg,#ff5a5a,#d11f3a)}
+  #btnReset{background:linear-gradient(180deg,#ffc83d,#f08a00)}
+  .small{background:linear-gradient(180deg,#8a5cff,#5a2fd6);padding:12px 18px}
+  #arbar{display:none;align-items:center;gap:8px;background:#0008;padding:8px 14px;border-radius:999px;font-size:14px}
+  body.ar #arbar{display:flex}
+  #arbar input{width:130px}
+
+  /* resultado */
+  #result{
+    position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:20;
+    background:#000a;backdrop-filter:blur(4px);padding:16px;
+  }
+  #result.show{display:flex}
+  .card{
+    width:min(92vw,460px);text-align:center;padding:28px 22px;border-radius:28px;
+    background:linear-gradient(160deg,#ffffff,#f1ecff);color:#1b1040;
+    box-shadow:0 0 0 6px #ffffff55,0 0 60px var(--glow,#a259ff),0 20px 50px #000a;
+    animation:pop .5s cubic-bezier(.2,1.6,.4,1);
+  }
+  @keyframes pop{from{transform:scale(.4) rotate(-6deg);opacity:0}to{transform:none;opacity:1}}
+  .card .emoji{font-size:90px;line-height:1;display:block;animation:bob 1.6s ease-in-out infinite}
+  @keyframes bob{50%{transform:translateY(-10px) scale(1.06)}}
+  .card h2{margin:10px 0 4px;font-size:clamp(26px,7vw,40px);font-weight:900}
+  .card p{margin:0 0 18px;font-size:clamp(16px,4vw,21px)}
+  body.ar .card{width:min(92vw,360px);padding:18px}
+  body.ar .card .emoji{font-size:56px}
+
+  #fx{position:fixed;inset:0;pointer-events:none;z-index:30}
+  #cfg{position:fixed;right:10px;top:max(10px,env(safe-area-inset-top));display:flex;gap:8px;z-index:10}
+  #cfg button{padding:8px 12px;font-size:18px;box-shadow:none;background:#ffffff22}
+</style>
+</head>
+<body>
+<video id="cam" playsinline muted></video>
+
+<div id="cfg">
+  <button id="btnMute" title="Sonido">🔊</button>
+</div>
+
+<header>
+  <h1>¡GIRÁ Y GANÁ!</h1>
+  <p>Jairo Indumentaria · Expo Juy 2026</p>
+</header>
+
+<div id="scene">
+  <div id="stage"><canvas id="wheel"></canvas></div>
+</div>
+
+<div id="controls">
+  <button id="btnSpin">▶ GIRAR</button>
+  <button id="btnStop" disabled>■ PARAR</button>
+  <button id="btnReset">↺ REINICIAR</button>
+  <button id="btnAR" class="small">📷 Modo AR</button>
+  <div id="arbar">
+    <span>Tamaño</span>
+    <input id="size" type="range" min="0.4" max="1.6" step="0.05" value="1">
+    <button id="btnExitAR" class="small" style="padding:6px 12px;font-size:14px;box-shadow:none">✕ Salir</button>
+  </div>
+</div>
+
+<div id="result">
+  <div class="card">
+    <span class="emoji" id="rEmoji">🎁</span>
+    <h2 id="rTitle"></h2>
+    <p id="rText"></p>
+    <button id="btnAgain" style="background:linear-gradient(180deg,#ffc83d,#f08a00)">↺ REINICIAR</button>
+  </div>
+</div>
+
+<canvas id="fx"></canvas>
+
+<script>
+/* ============================================================
+   CONFIGURACIÓN — acá se ajustan las probabilidades
+   (los pesos no hace falta que sumen 100)
+   ============================================================ */
+const CONFIG = {
+  prizes: {
+    buzo: { weight: 5,  emoji: '🎓', short: 'BUZO',   name: 'Mini buzo de egresado' },
+    aur:  { weight: 15, emoji: '🎧', short: 'ESTUCHE', name: 'Estuche para auriculares' },
+    suj:  { weight: 35, emoji: '🔌', short: 'SUJETACABLES', name: 'Sujetacables' },
+    nada: { weight: 45, emoji: '😅', short: '¡SUERTE!', name: '' }
+  },
+  spinSpeed: 540,      // grados por segundo mientras gira
+  stopTime: 4.5,       // segundos que tarda en frenar al apretar PARAR
+  logoFile: 'logo.png',// logo de la marca (misma carpeta que este HTML)
+  logoInner: 0.82      // proporción del círculo blanco dentro de la imagen del logo
+};
+
+/* Distribución de los 12 gajos (1 buzo, 2 estuches, 4 sujetacables, 5 sin premio) */
+const SLICES = ['nada','suj','nada','aur','nada','suj','buzo','nada','suj','aur','nada','suj'];
+const COLORS = ['#ff3d81','#ffb800','#3ddc84','#00c2ff','#a259ff','#ff6b35',
+                '#ffd60a','#00e5a8','#4d7cff','#ff4fd8','#8bdc2c','#ff8f1f'];
+const STEP = 360 / SLICES.length;
+
+/* ---------- elementos ---------- */
+const $ = id => document.getElementById(id);
+const canvas = $('wheel'), ctx = canvas.getContext('2d');
+const stage = $('stage'), cam = $('cam');
+const btnSpin = $('btnSpin'), btnStop = $('btnStop'), btnReset = $('btnReset');
+
+/* ---------- logo ---------- */
+const logo = new Image(); let logoOk = false;
+logo.onload = () => logoOk = true;
+logo.src = CONFIG.logoFile;
+
+/* ---------- estado ---------- */
+let theta = 0, mode = 'idle';      // idle | spinning | stopping | done
+let targetKey = null, targetIdx = 0;
+let stopFrom = 0, stopDelta = 0, stopStart = 0;
+let lastTick = 0, wiggle = 0, lastT = performance.now();
+let muted = false;
+
+const mod = (a, n) => ((a % n) + n) % n;
+
+/* ---------- audio ---------- */
+let AC = null;
+function audio(){ if(!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+function beep(freq, dur=.08, type='square', vol=.08, when=0){
+  if(muted) return; const a = audio(); if(!a) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.value = freq; g.gain.value = vol;
+  o.connect(g); g.connect(a.destination);
+  const t = a.currentTime + when;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.start(t); o.stop(t + dur + .02);
+}
+const sfxWin  = big => (big ? [523,659,784,1047,1319,1568] : [523,659,784,1047]).forEach((f,i)=>beep(f,.22,'triangle',.12,i*.11));
+const sfxLose = () => { beep(330,.25,'sawtooth',.08,0); beep(247,.4,'sawtooth',.08,.22); };
+$('btnMute').onclick = e => { muted = !muted; e.target.textContent = muted ? '🔇' : '🔊'; };
+
+/* ---------- sorteo ponderado ---------- */
+function drawPrize(){
+  const entries = Object.entries(CONFIG.prizes);
+  const total = entries.reduce((s,[,p]) => s + p.weight, 0);
+  let r = Math.random() * total;
+  for(const [k,p] of entries){ if((r -= p.weight) < 0) return k; }
+  return entries[entries.length-1][0];
+}
+
+/* ---------- dibujo ---------- */
+function fitCanvas(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const w = canvas.clientWidth;
+  if(canvas.width !== Math.round(w*dpr)){ canvas.width = canvas.height = Math.round(w*dpr); }
+  return { dpr, w };
+}
+
+function render(now){
+  const { dpr, w } = fitCanvas();
+  const S = w * dpr;                      // lado en píxeles
+  const cx = S/2, cy = S/2, R = S/2 * 0.84;   // deja margen para aro, luces y puntero
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,S,S);
+
+  // aro exterior
+  const rim = ctx.createLinearGradient(0,0,S,S);
+  rim.addColorStop(0,'#ffe27a'); rim.addColorStop(.5,'#ff8a00'); rim.addColorStop(1,'#ffe27a');
+  ctx.beginPath(); ctx.arc(cx,cy,R+S*0.045,0,Math.PI*2); ctx.fillStyle = rim; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,R+S*0.004,0,Math.PI*2); ctx.fillStyle = '#1a1033'; ctx.fill();
+
+  // gajos
+  const base = (-90 + theta) * Math.PI/180;
+  for(let i=0;i<SLICES.length;i++){
+    const a0 = base + i*STEP*Math.PI/180, a1 = a0 + STEP*Math.PI/180;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a0,a1); ctx.closePath();
+    const g = ctx.createRadialGradient(cx,cy,R*.2,cx,cy,R);
+    g.addColorStop(0,COLORS[i]); g.addColorStop(1,shade(COLORS[i],-28));
+    ctx.fillStyle = g; ctx.fill();
+    ctx.lineWidth = S*0.006; ctx.strokeStyle = '#ffffffcc'; ctx.stroke();
+
+    // texto
+    const p = CONFIG.prizes[SLICES[i]];
+    ctx.save();
+    ctx.translate(cx,cy); ctx.rotate((a0+a1)/2);
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    const label = p.short + ' ' + p.emoji;
+    const maxW = R*0.58;
+    let fs = S*0.042;
+    ctx.font = `900 ${fs}px "Trebuchet MS",Arial,sans-serif`;
+    const mw = ctx.measureText(label).width;
+    if(mw > maxW){ fs *= maxW/mw; ctx.font = `900 ${fs}px "Trebuchet MS",Arial,sans-serif`; }
+    ctx.lineWidth = fs*0.22; ctx.strokeStyle = '#0006'; ctx.lineJoin = 'round';
+    ctx.strokeText(label, R*0.93, 0);
+    ctx.fillStyle = '#fff'; ctx.fillText(label, R*0.93, 0);
+    ctx.restore();
+  }
+
+  // luces del borde
+  const bulbs = 24;
+  for(let i=0;i<bulbs;i++){
+    const a = i/bulbs*Math.PI*2 - Math.PI/2;
+    const rr = R + S*0.024;
+    const on = (Math.floor(now/260) + i) % 2 === 0;
+    ctx.beginPath(); ctx.arc(cx+Math.cos(a)*rr, cy+Math.sin(a)*rr, S*0.0125, 0, Math.PI*2);
+    ctx.fillStyle = on ? '#fffbd0' : '#c77a00';
+    if(on){ ctx.shadowColor = '#fff6a0'; ctx.shadowBlur = S*0.03; }
+    ctx.fill(); ctx.shadowBlur = 0;
+  }
+
+  // centro con el logo (fijo, no gira)
+  const rc = R*0.31;
+  ctx.beginPath(); ctx.arc(cx,cy,rc+S*0.018,0,Math.PI*2);
+  ctx.fillStyle = rim; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,rc,0,Math.PI*2); ctx.fillStyle = '#fff'; ctx.fill();
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx,cy,rc-S*0.004,0,Math.PI*2); ctx.clip();
+  if(logoOk){
+    const m = Math.min(logo.naturalWidth, logo.naturalHeight) * CONFIG.logoInner;
+    const sx = (logo.naturalWidth - m)/2, sy = (logo.naturalHeight - m)/2;
+    ctx.drawImage(logo, sx, sy, m, m, cx-rc, cy-rc, rc*2, rc*2);
+  } else {
+    // respaldo si todavía no está logo.png
+    ctx.fillStyle = '#111'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `900 ${rc*0.50}px "Trebuchet MS",Arial,sans-serif`;
+    ctx.fillText('JAIRO', cx, cy - rc*0.14);
+    ctx.font = `700 ${rc*0.205}px "Trebuchet MS",Arial,sans-serif`;
+    ctx.fillText('INDUMENTARIA', cx, cy + rc*0.26);
+  }
+  ctx.restore();
+
+  // puntero (arriba)
+  ctx.save();
+  ctx.translate(cx, cy - R - S*0.045);
+  ctx.rotate(wiggle * Math.PI/180);
+  ctx.beginPath();
+  ctx.moveTo(-S*0.05, -S*0.015); ctx.lineTo(S*0.05, -S*0.015); ctx.lineTo(0, S*0.105); ctx.closePath();
+  ctx.fillStyle = '#ff2d55'; ctx.shadowColor = '#0008'; ctx.shadowBlur = S*0.02;
+  ctx.fill(); ctx.shadowBlur = 0;
+  ctx.lineWidth = S*0.007; ctx.strokeStyle = '#fff'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, 0, S*0.016, 0, Math.PI*2); ctx.fillStyle = '#fff'; ctx.fill();
+  ctx.restore();
+}
+
+function shade(hex, pct){
+  const n = parseInt(hex.slice(1),16);
+  let r = n>>16, g = (n>>8)&255, b = n&255;
+  const f = v => Math.max(0, Math.min(255, Math.round(v + 255*pct/100)));
+  return `rgb(${f(r)},${f(g)},${f(b)})`;
+}
+
+/* ---------- lógica de giro ---------- */
+function loop(now){
+  const dt = Math.min(.05, (now - lastT)/1000); lastT = now;
+
+  if(mode === 'spinning'){
+    theta += CONFIG.spinSpeed * dt;
+  } else if(mode === 'stopping'){
+    const p = Math.min(1, (now - stopStart)/(CONFIG.stopTime*1000));
+    theta = stopFrom + stopDelta * (1 - Math.pow(1-p, 3));
+    if(p >= 1){ mode = 'done'; finish(); }
+  }
+
+  // sonido y rebote del puntero al pasar cada gajo
+  if(mode === 'spinning' || mode === 'stopping'){
+    const idx = Math.floor(theta / STEP);
+    if(idx !== lastTick){ lastTick = idx; beep(900,.04,'square',.04); wiggle = -16; }
+  }
+  wiggle *= Math.pow(.0005, dt);
+
+  render(now);
+  updateStage(now);
+  drawFx(dt);
+  requestAnimationFrame(loop);
+}
+
+function setButtons(){
+  btnSpin.disabled = mode !== 'idle';
+  btnStop.disabled = mode !== 'spinning';
+}
+
+btnSpin.onclick = () => {
+  if(mode !== 'idle') return;
+  audio(); if(AC && AC.state === 'suspended') AC.resume();
+  targetKey = drawPrize();                       // se define el premio según probabilidades
+  const options = SLICES.map((k,i)=>k===targetKey?i:-1).filter(i=>i>=0);
+  targetIdx = options[Math.floor(Math.random()*options.length)];
+  mode = 'spinning'; setButtons();
+};
+
+btnStop.onclick = () => {
+  if(mode !== 'spinning') return;
+  const T = CONFIG.stopTime;
+  const jitter = (Math.random()-.5) * STEP * 0.6;           // no cae siempre en el centro del gajo
+  const desired = mod(-(targetIdx*STEP + STEP/2 + jitter), 360);
+  let delta = CONFIG.spinSpeed * T / 3 + 360;               // arranca a la velocidad actual
+  delta += mod(desired - (theta + delta), 360);
+  stopFrom = theta; stopDelta = delta; stopStart = performance.now();
+  mode = 'stopping'; setButtons();
+};
+
+btnReset.onclick = $('btnAgain').onclick = reset;
+function reset(){
+  mode = 'idle'; theta = 0; targetKey = null; lastTick = 0;
+  $('result').classList.remove('show'); parts.length = 0;
+  setButtons();
+}
+
+function finish(){
+  const p = CONFIG.prizes[targetKey];
+  const win = targetKey !== 'nada';
+  $('rEmoji').textContent = win ? p.emoji : '😅';
+  $('rTitle').textContent = win ? '¡GANASTE!' : '¡Casi!';
+  $('rText').textContent = win ? p.name : 'Esta vez no hubo premio. ¡Gracias por participar!';
+  document.documentElement.style.setProperty('--glow', win ? '#ffb800' : '#6b7cff');
+  setTimeout(() => $('result').classList.add('show'), 450);
+  if(win){ confetti(targetKey === 'buzo' ? 260 : 120); sfxWin(targetKey === 'buzo'); }
+  else sfxLose();
+  setButtons();
+}
+
+/* ---------- confeti ---------- */
+const fx = $('fx'), fctx = fx.getContext('2d'); const parts = [];
+function confetti(n){
+  const W = innerWidth, H = innerHeight;
+  for(let i=0;i<n;i++){
+    parts.push({
+      x: W/2 + (Math.random()-.5)*W*.3, y: H*.45,
+      vx: (Math.random()-.5)*900, vy: -Math.random()*900 - 200,
+      s: 6 + Math.random()*8, r: Math.random()*6, vr: (Math.random()-.5)*14,
+      c: COLORS[Math.floor(Math.random()*COLORS.length)], life: 4 + Math.random()*2
+    });
+  }
+}
+function drawFx(dt){
+  const dpr = Math.min(devicePixelRatio||1, 2);
+  if(fx.width !== innerWidth*dpr){ fx.width = innerWidth*dpr; fx.height = innerHeight*dpr; }
+  fctx.setTransform(dpr,0,0,dpr,0,0); fctx.clearRect(0,0,innerWidth,innerHeight);
+  for(let i=parts.length-1;i>=0;i--){
+    const p = parts[i];
+    p.vy += 1500*dt; p.vx *= .995; p.x += p.vx*dt; p.y += p.vy*dt; p.r += p.vr*dt; p.life -= dt;
+    if(p.life <= 0 || p.y > innerHeight+40){ parts.splice(i,1); continue; }
+    fctx.save(); fctx.translate(p.x,p.y); fctx.rotate(p.r);
+    fctx.fillStyle = p.c; fctx.fillRect(-p.s/2,-p.s/4,p.s,p.s/2); fctx.restore();
+  }
+}
+
+/* ---------- Modo AR (cámara + ruleta flotando en 3D) ---------- */
+let ar = false, stream = null, arX = 0, arY = 0, arS = 1, tiltX = 0, tiltY = 0, oriOn = false;
+
+function updateStage(now){
+  if(!ar){ stage.style.transform = ''; return; }
+  const bob = Math.sin(now/700)*8;
+  stage.style.transform =
+    `translate(${arX}px,${arY+bob}px) scale(${arS}) rotateX(${16+tiltX}deg) rotateY(${tiltY}deg)`;
+}
+
+function onOri(e){
+  if(e.beta == null) return; oriOn = true;
+  tiltY = Math.max(-18, Math.min(18, (e.gamma||0)/3));
+  tiltX = Math.max(-14, Math.min(14, ((e.beta||0)-60)/4));
+}
+window.addEventListener('mousemove', e => {
+  if(!ar || oriOn) return;
+  tiltY = (e.clientX/innerWidth - .5) * 24;
+  tiltX = (e.clientY/innerHeight - .5) * -16;
+});
+
+$('btnAR').onclick = async () => {
+  try{
+    if(window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function'){
+      await DeviceOrientationEvent.requestPermission().catch(()=>{});
+    }
+    stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:'environment' } }, audio:false });
+    cam.srcObject = stream; await cam.play();
+    ar = true; document.body.classList.add('ar');
+    window.addEventListener('deviceorientation', onOri);
+  }catch(err){
+    alert('No se pudo abrir la cámara. Revisá el permiso del navegador y que la página esté abierta por HTTPS (o localmente).');
+  }
+};
+function exitAR(){
+  ar = false; document.body.classList.remove('ar');
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
+  window.removeEventListener('deviceorientation', onOri);
+  arX = arY = 0; arS = 1; $('size').value = 1; tiltX = tiltY = 0;
+}
+$('btnExitAR').onclick = exitAR;
+$('size').oninput = e => arS = parseFloat(e.target.value);
+
+// arrastrar la ruleta en AR
+let drag = null;
+stage.addEventListener('pointerdown', e => { if(!ar) return; drag = {x:e.clientX-arX, y:e.clientY-arY}; stage.setPointerCapture(e.pointerId); });
+stage.addEventListener('pointermove', e => { if(drag){ arX = e.clientX-drag.x; arY = e.clientY-drag.y; } });
+stage.addEventListener('pointerup', () => drag = null);
+
+setButtons();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
